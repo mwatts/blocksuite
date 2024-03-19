@@ -20,6 +20,7 @@ import {
   type ElementModelMap,
   propsToY,
 } from './element-model/index.js';
+import type { MindmapElementModel } from './element-model/mindmap.js';
 import { connectorMiddleware } from './middlewares/connector.js';
 import { groupMiddleware } from './middlewares/group.js';
 import { SurfaceBlockTransformer } from './surface-transformer.js';
@@ -172,6 +173,8 @@ export class SurfaceBlockModel extends BlockModel<SurfaceBlockProps> {
   private _elementToGroup: Map<string, string> = new Map();
   private _connectorToElements: Map<string, string[]> = new Map();
   private _elementToConnector: Map<string, string[]> = new Map();
+  private _elementToMindmap: Map<string, string> = new Map();
+  private _mindmapToElements: Map<string, string[]> = new Map();
 
   elementUpdated = new Slot<ElementUpdatedData>();
   elementAdded = new Slot<{ id: string }>();
@@ -196,6 +199,7 @@ export class SurfaceBlockModel extends BlockModel<SurfaceBlockProps> {
     this._initElementModels();
     this._watchGroupRelationChange();
     this._watchConnectorRelationChange();
+    this._watchMindmapRelationChange();
     this._applyMiddlewares();
   }
 
@@ -431,6 +435,80 @@ export class SurfaceBlockModel extends BlockModel<SurfaceBlockProps> {
     });
   }
 
+  private _watchMindmapRelationChange() {
+    const addMindmap = (elementId: string, mindmapId: string) => {
+      this._elementToMindmap.set(elementId, mindmapId);
+
+      if (this._mindmapToElements.has(mindmapId)) {
+        this._mindmapToElements.get(mindmapId)!.push(elementId);
+      } else {
+        this._mindmapToElements.set(mindmapId, [elementId]);
+      }
+    };
+    const removeMindmap = (elementId: string, mindmapId: string) => {
+      if (this._elementToMindmap.has(elementId)) {
+        const mindmap = this._elementToMindmap.get(elementId)!;
+        if (mindmap === mindmapId) {
+          this._elementToMindmap.delete(elementId);
+        }
+      }
+
+      if (this._mindmapToElements.has(mindmapId)) {
+        const elements = this._mindmapToElements.get(mindmapId)!;
+        const index = elements.indexOf(elementId);
+
+        if (index !== -1) {
+          elements.splice(index, 1);
+          elements.length === 0 && this._mindmapToElements.delete(mindmapId);
+        }
+      }
+    };
+
+    this.elementModels.forEach(model => {
+      if (model.type === 'mindmap') {
+        (model as MindmapElementModel).nodeIds.forEach(nodeId => {
+          addMindmap(nodeId, model.id);
+        });
+      }
+    });
+
+    this.elementUpdated.on(({ id, oldValues }) => {
+      const element = this.getElementById(id)!;
+
+      if (element.type === 'mindmap' && oldValues['nodeIds']) {
+        (oldValues['nodeIds'] as string[]).forEach(nodeId => {
+          removeMindmap(nodeId, id);
+        });
+
+        (element as MindmapElementModel).nodeIds.forEach(nodeId => {
+          addMindmap(nodeId, id);
+        });
+
+        if ((element as MindmapElementModel).nodeIds.length === 0) {
+          this.removeElement(id);
+        }
+      }
+    });
+
+    this.elementAdded.on(({ id }) => {
+      const element = this.getElementById(id)!;
+
+      if (element.type === 'mindmap') {
+        (element as MindmapElementModel).nodeIds.forEach(nodeId => {
+          addMindmap(nodeId, id);
+        });
+      }
+    });
+
+    this.elementRemoved.on(({ id, type }) => {
+      if (type === 'mindmap') {
+        const nodes = [...(this._mindmapToElements.get(id) || [])];
+
+        nodes.forEach(nodeId => removeMindmap(nodeId, id));
+      }
+    });
+  }
+
   override dispose(): void {
     super.dispose();
 
@@ -442,6 +520,18 @@ export class SurfaceBlockModel extends BlockModel<SurfaceBlockProps> {
 
     this._elementModels.forEach(({ unmount }) => unmount());
     this._elementModels.clear();
+  }
+
+  getMindmap(id: string) {
+    return (
+      (this._elementToMindmap.has(id)
+        ? this.getElementById(this._elementToMindmap.get(id)!)
+        : null) ?? null
+    );
+  }
+
+  isInMindmap(id: string) {
+    return this._elementToMindmap.has(id);
   }
 
   getConnectors(id: string) {
