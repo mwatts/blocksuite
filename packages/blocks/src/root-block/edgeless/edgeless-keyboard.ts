@@ -50,6 +50,29 @@ export class EdgelessPageKeyboardManager extends PageKeyboardManager {
             panning: false,
           });
         },
+        m: () => {
+          const edgelessService = this.rootElement.service;
+          const lastMousePosition = edgelessService.tool.lastMousePos;
+          const [x, y] = edgelessService.viewport.toModelCoord(
+            lastMousePosition.x,
+            lastMousePosition.y
+          );
+
+          const elementId = edgelessService.addElement('shape', {
+            fillColor: '--affine-palette-shape-white',
+            strokeColor: '--affine-palette-line-black',
+            xywh: `[${x}, ${y}, 150, 100]`,
+            text: 'Mindmap',
+          });
+
+          edgelessService.addElement('mindmap', {
+            children: {
+              [elementId]: {
+                index: 'a0',
+              },
+            },
+          });
+        },
         n: () => {
           this._setEdgelessTool(rootElement, {
             type: 'affine:note',

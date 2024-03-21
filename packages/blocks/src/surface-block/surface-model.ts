@@ -8,19 +8,21 @@ import {
   Text,
 } from '@blocksuite/store';
 
-import type { ElementModel } from './element-model/base.js';
+import {
+  type BaseProps,
+  type ElementModel,
+  GroupLikeModel,
+} from './element-model/base.js';
 import type {
   Connection,
   ConnectorElementModel,
 } from './element-model/connector.js';
-import type { GroupElementModel } from './element-model/group.js';
 import {
   createElementModel,
   createModelFromProps,
   type ElementModelMap,
   propsToY,
 } from './element-model/index.js';
-import type { MindmapElementModel } from './element-model/mindmap.js';
 import { connectorMiddleware } from './middlewares/connector.js';
 import { groupMiddleware } from './middlewares/group.js';
 import { SurfaceBlockTransformer } from './surface-transformer.js';
@@ -34,6 +36,7 @@ export interface ElementUpdatedData {
   id: string;
   props: Record<string, unknown>;
   oldValues: Record<string, unknown>;
+  local: boolean;
 }
 
 const migration = {
@@ -173,15 +176,14 @@ export class SurfaceBlockModel extends BlockModel<SurfaceBlockProps> {
   private _elementToGroup: Map<string, string> = new Map();
   private _connectorToElements: Map<string, string[]> = new Map();
   private _elementToConnector: Map<string, string[]> = new Map();
-  private _elementToMindmap: Map<string, string> = new Map();
-  private _mindmapToElements: Map<string, string[]> = new Map();
 
   elementUpdated = new Slot<ElementUpdatedData>();
-  elementAdded = new Slot<{ id: string }>();
+  elementAdded = new Slot<{ id: string; local: boolean }>();
   elementRemoved = new Slot<{
     id: string;
     type: string;
     model: ElementModel;
+    local: boolean;
   }>();
 
   get elementModels() {
@@ -199,7 +201,6 @@ export class SurfaceBlockModel extends BlockModel<SurfaceBlockProps> {
     this._initElementModels();
     this._watchGroupRelationChange();
     this._watchConnectorRelationChange();
-    this._watchMindmapRelationChange();
     this._applyMiddlewares();
   }
 
@@ -209,7 +210,10 @@ export class SurfaceBlockModel extends BlockModel<SurfaceBlockProps> {
 
   private _initElementModels() {
     const elementsYMap = this.elements.getValue()!;
-    const onElementsMapChange = (event: Y.YMapEvent<Y.Map<unknown>>) => {
+    const onElementsMapChange = (
+      event: Y.YMapEvent<Y.Map<unknown>>,
+      transaction: Y.Transaction
+    ) => {
       const { changes, keysChanged } = event;
 
       keysChanged.forEach(id => {
@@ -235,14 +239,19 @@ export class SurfaceBlockModel extends BlockModel<SurfaceBlockProps> {
               }
               const { mount } = this._elementModels.get(id)!;
               mount();
-              this.elementAdded.emit({ id });
+              this.elementAdded.emit({ id, local: transaction.local });
             }
             break;
           case 'delete':
             if (this._elementModels.has(id)) {
               const { model, unmount } = this._elementModels.get(id)!;
               unmount();
-              this.elementRemoved.emit({ id, type: model.type, model });
+              this.elementRemoved.emit({
+                id,
+                type: model.type,
+                model,
+                local: transaction.local,
+              });
               this._elementToGroup.delete(id);
               this._elementToConnector.delete(id);
               this._elementModels.delete(id);
@@ -300,10 +309,14 @@ export class SurfaceBlockModel extends BlockModel<SurfaceBlockProps> {
         }
       }
     };
+    const isGroup = (
+      element: ElementModel
+    ): element is GroupLikeModel<BaseProps> =>
+      element instanceof GroupLikeModel;
 
     this.elementModels.forEach(model => {
-      if (model.type === 'group') {
-        (model as GroupElementModel).childIds.forEach(childId => {
+      if (isGroup(model)) {
+        model.childIds.forEach(childId => {
           addToGroup(childId, model.id);
         });
       }
@@ -312,16 +325,16 @@ export class SurfaceBlockModel extends BlockModel<SurfaceBlockProps> {
     this.elementUpdated.on(({ id, oldValues }) => {
       const element = this.getElementById(id)!;
 
-      if (element.type === 'group' && oldValues['childIds']) {
+      if (isGroup(element) && oldValues['childIds']) {
         (oldValues['childIds'] as string[]).forEach(childId => {
           removeFromGroup(childId, id);
         });
 
-        (element as GroupElementModel).childIds.forEach(childId => {
+        element.childIds.forEach(childId => {
           addToGroup(childId, id);
         });
 
-        if ((element as GroupElementModel).childIds.length === 0) {
+        if (element.childIds.length === 0) {
           this.removeElement(id);
         }
       }
@@ -330,15 +343,16 @@ export class SurfaceBlockModel extends BlockModel<SurfaceBlockProps> {
     this.elementAdded.on(({ id }) => {
       const element = this.getElementById(id)!;
 
-      if (element.type === 'group') {
-        (element as GroupElementModel).childIds.forEach(childId => {
+      if (isGroup(element)) {
+        console.log(element, element.childIds);
+        element.childIds.forEach(childId => {
           addToGroup(childId, id);
         });
       }
     });
 
-    this.elementRemoved.on(({ id, type }) => {
-      if (type === 'group') {
+    this.elementRemoved.on(({ id, model }) => {
+      if (isGroup(model)) {
         const children = [...(this._groupToElements.get(id) || [])];
 
         children.forEach(childId => removeFromGroup(childId, id));
@@ -435,80 +449,6 @@ export class SurfaceBlockModel extends BlockModel<SurfaceBlockProps> {
     });
   }
 
-  private _watchMindmapRelationChange() {
-    const addMindmap = (elementId: string, mindmapId: string) => {
-      this._elementToMindmap.set(elementId, mindmapId);
-
-      if (this._mindmapToElements.has(mindmapId)) {
-        this._mindmapToElements.get(mindmapId)!.push(elementId);
-      } else {
-        this._mindmapToElements.set(mindmapId, [elementId]);
-      }
-    };
-    const removeMindmap = (elementId: string, mindmapId: string) => {
-      if (this._elementToMindmap.has(elementId)) {
-        const mindmap = this._elementToMindmap.get(elementId)!;
-        if (mindmap === mindmapId) {
-          this._elementToMindmap.delete(elementId);
-        }
-      }
-
-      if (this._mindmapToElements.has(mindmapId)) {
-        const elements = this._mindmapToElements.get(mindmapId)!;
-        const index = elements.indexOf(elementId);
-
-        if (index !== -1) {
-          elements.splice(index, 1);
-          elements.length === 0 && this._mindmapToElements.delete(mindmapId);
-        }
-      }
-    };
-
-    this.elementModels.forEach(model => {
-      if (model.type === 'mindmap') {
-        (model as MindmapElementModel).nodeIds.forEach(nodeId => {
-          addMindmap(nodeId, model.id);
-        });
-      }
-    });
-
-    this.elementUpdated.on(({ id, oldValues }) => {
-      const element = this.getElementById(id)!;
-
-      if (element.type === 'mindmap' && oldValues['nodeIds']) {
-        (oldValues['nodeIds'] as string[]).forEach(nodeId => {
-          removeMindmap(nodeId, id);
-        });
-
-        (element as MindmapElementModel).nodeIds.forEach(nodeId => {
-          addMindmap(nodeId, id);
-        });
-
-        if ((element as MindmapElementModel).nodeIds.length === 0) {
-          this.removeElement(id);
-        }
-      }
-    });
-
-    this.elementAdded.on(({ id }) => {
-      const element = this.getElementById(id)!;
-
-      if (element.type === 'mindmap') {
-        (element as MindmapElementModel).nodeIds.forEach(nodeId => {
-          addMindmap(nodeId, id);
-        });
-      }
-    });
-
-    this.elementRemoved.on(({ id, type }) => {
-      if (type === 'mindmap') {
-        const nodes = [...(this._mindmapToElements.get(id) || [])];
-
-        nodes.forEach(nodeId => removeMindmap(nodeId, id));
-      }
-    });
-  }
-
   override dispose(): void {
     super.dispose();
 
@@ -522,16 +462,12 @@ export class SurfaceBlockModel extends BlockModel<SurfaceBlockProps> {
     this._elementModels.clear();
   }
 
-  getMindmap(id: string) {
-    return (
-      (this._elementToMindmap.has(id)
-        ? this.getElementById(this._elementToMindmap.get(id)!)
-        : null) ?? null
-    );
-  }
-
   isInMindmap(id: string) {
-    return this._elementToMindmap.has(id);
+    const group = this.getGroup(id);
+
+    console.log(group, group?.type);
+
+    return group?.type === 'mindmap';
   }
 
   getConnectors(id: string) {
@@ -540,16 +476,16 @@ export class SurfaceBlockModel extends BlockModel<SurfaceBlockProps> {
     ) as ConnectorElementModel[];
   }
 
-  getGroup(id: string): GroupElementModel | null {
+  getGroup<T extends GroupLikeModel<BaseProps> = GroupLikeModel<BaseProps>>(
+    id: string
+  ): T | null {
     return this._elementToGroup.has(id)
-      ? (this.getElementById(
-          this._elementToGroup.get(id)!
-        ) as GroupElementModel)
+      ? (this.getElementById(this._elementToGroup.get(id)!) as T)
       : null;
   }
 
-  getGroups(id: string): GroupElementModel[] {
-    const groups: GroupElementModel[] = [];
+  getGroups(id: string): GroupLikeModel<BaseProps>[] {
+    const groups: GroupLikeModel<BaseProps>[] = [];
     let group = this.getGroup(id);
 
     while (group) {

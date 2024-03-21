@@ -6,12 +6,16 @@ import { styleMap } from 'lit/directives/style-map.js';
 
 import type { RichText } from '../../../../_common/components/rich-text/rich-text.js';
 import { isCssVariable } from '../../../../_common/theme/css-variables.js';
-import type { ShapeElementModel } from '../../../../surface-block/element-model/index.js';
+import type {
+  MindmapElementModel,
+  ShapeElementModel,
+} from '../../../../surface-block/element-model/index.js';
 import { SHAPE_TEXT_PADDING } from '../../../../surface-block/elements/shape/consts.js';
 import { Bound, toRadian, Vec } from '../../../../surface-block/index.js';
 import { wrapFontFamily } from '../../../../surface-block/utils/font.js';
 import type { EdgelessRootBlockComponent } from '../../edgeless-root-block.js';
 import { getSelectedRect } from '../../utils/query.js';
+import { mountShapeTextEditor } from '../../utils/text.js';
 
 @customElement('edgeless-shape-text-editor')
 export class EdgelessShapeTextEditor extends WithDisposable(ShadowlessElement) {
@@ -115,6 +119,8 @@ export class EdgelessShapeTextEditor extends WithDisposable(ShadowlessElement) {
         );
       })
       .catch(console.error);
+
+    this._initMindmapKeyBindings();
   }
 
   override async getUpdateComplete(): Promise<boolean> {
@@ -133,6 +139,80 @@ export class EdgelessShapeTextEditor extends WithDisposable(ShadowlessElement) {
     this.edgeless.service.selection.set({
       elements: [],
       editing: false,
+    });
+  }
+
+  private _initMindmapKeyBindings() {
+    if (!this.element.surface.isInMindmap(this.element.id)) {
+      return;
+    }
+
+    this.edgeless.bindHotKey({
+      Enter: evt => {
+        console.log(evt);
+      },
+      Tab: evt => {
+        console.log(evt);
+      },
+    });
+
+    this._disposables.addFromEvent(this, 'keydown', evt => {
+      switch (evt.key) {
+        case 'Enter': {
+          evt.preventDefault();
+          const edgeless = this.edgeless;
+          const element = this.element;
+          const mindmap = this.element.group as MindmapElementModel;
+          const parent = mindmap.getParentNode(element.id) ?? element;
+
+          edgeless.doc.transact(() => {
+            const id = edgeless.service.addElement('shape', {
+              fillColor: element.fillColor,
+              strokeColor: element.strokeColor,
+              xywh: `[0, 0, 150, 100]`,
+              text: '',
+            });
+
+            mindmap.addNode(id, parent.id);
+
+            requestAnimationFrame(() => {
+              mountShapeTextEditor(
+                edgeless.service.getElementById(id) as ShapeElementModel,
+                edgeless
+              );
+            });
+          });
+
+          (this.ownerDocument.activeElement as HTMLElement).blur();
+          break;
+        }
+        case 'Tab': {
+          evt.preventDefault();
+          const edgeless = this.edgeless;
+          const element = this.element;
+          const mindmap = this.element.group as MindmapElementModel;
+
+          edgeless.doc.transact(() => {
+            const id = edgeless.service.addElement('shape', {
+              fillColor: element.fillColor,
+              strokeColor: element.strokeColor,
+              xywh: `[0, 0, 150, 100]`,
+              text: '',
+            });
+
+            mindmap.addNode(id, element.id);
+
+            requestAnimationFrame(() => {
+              mountShapeTextEditor(
+                edgeless.service.getElementById(id) as ShapeElementModel,
+                edgeless
+              );
+            });
+          });
+
+          (this.ownerDocument.activeElement as HTMLElement).blur();
+        }
+      }
     });
   }
 

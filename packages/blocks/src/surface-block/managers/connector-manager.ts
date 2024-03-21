@@ -11,6 +11,7 @@ import type { IBound } from '../consts.js';
 import type {
   Connection,
   ConnectorElementModel,
+  StatelessConnectorElementModel,
 } from '../element-model/connector.js';
 import { ConnectorMode } from '../element-model/connector.js';
 import { AStarRunner } from '../utils/a-star.js';
@@ -43,7 +44,7 @@ function rBound(ele: EdgelessModel, anti = false): IBound {
 }
 
 export function isConnectorAndBindingsAllSelected(
-  connector: ConnectorElementModel,
+  connector: ConnectorElementModel | StatelessConnectorElementModel,
   selected: Selectable[]
 ) {
   const connectorSelected = selected.find(s => s.id === connector.id);
@@ -883,7 +884,7 @@ export class ConnectorPathGenerator {
   ) {}
 
   private _getConnectorEndElement(
-    connector: ConnectorElementModel,
+    connector: ConnectorElementModel | StatelessConnectorElementModel,
     type: 'source' | 'target'
   ): Connectable | null {
     const id = connector[type].id;
@@ -896,7 +897,7 @@ export class ConnectorPathGenerator {
   }
 
   private _getConnectionPoint(
-    connector: ConnectorElementModel,
+    connector: ConnectorElementModel | StatelessConnectorElementModel,
     type: 'source' | 'target'
   ): PointLocation {
     const connection = connector[type];
@@ -918,7 +919,9 @@ export class ConnectorPathGenerator {
     }
   }
 
-  private _generateStraightConnectorPath(connector: ConnectorElementModel) {
+  private _generateStraightConnectorPath(
+    connector: ConnectorElementModel | StatelessConnectorElementModel
+  ) {
     const { source, target } = connector;
     if (source.id && !source.position && target.id && !target.position) {
       const start = this._getConnectorEndElement(
@@ -941,7 +944,9 @@ export class ConnectorPathGenerator {
     }
   }
 
-  private _computeStartEndPoint(connector: ConnectorElementModel) {
+  private _computeStartEndPoint(
+    connector: ConnectorElementModel | StatelessConnectorElementModel
+  ) {
     const { source, target } = connector;
     const start = this._getConnectorEndElement(connector, 'source');
     const end = this._getConnectorEndElement(connector, 'target');
@@ -974,7 +979,9 @@ export class ConnectorPathGenerator {
     return [startPoint, endPoint];
   }
 
-  private _generateCurveConnectorPath(connector: ConnectorElementModel) {
+  private _generateCurveConnectorPath(
+    connector: ConnectorElementModel | StatelessConnectorElementModel
+  ) {
     const { source, target } = connector;
 
     if (source.id || target.id) {
@@ -1087,7 +1094,9 @@ export class ConnectorPathGenerator {
     ];
   }
 
-  private _generateConnectorPath(connector: ConnectorElementModel) {
+  private _generateConnectorPath(
+    connector: ConnectorElementModel | StatelessConnectorElementModel
+  ) {
     const { mode } = connector;
     if (mode === ConnectorMode.Straight) {
       return this._generateStraightConnectorPath(connector);
@@ -1116,7 +1125,10 @@ export class ConnectorPathGenerator {
     throw new Error('unknown connector mode');
   }
 
-  updatePath(connector: ConnectorElementModel, path?: PointLocation[]) {
+  updatePath(
+    connector: ConnectorElementModel | StatelessConnectorElementModel,
+    path?: PointLocation[]
+  ) {
     const points = path ?? this._generateConnectorPath(connector) ?? [];
 
     const bound = getBoundFromPoints(points);
@@ -1190,7 +1202,9 @@ export class ConnectorPathGenerator {
     return path;
   }
 
-  hasRelatedElement(connecter: ConnectorElementModel) {
+  hasRelatedElement(
+    connecter: ConnectorElementModel | StatelessConnectorElementModel
+  ) {
     const { source, target } = connecter;
     if (
       (source.id && !this.options.getElementById(source.id)) ||

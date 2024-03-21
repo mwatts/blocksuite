@@ -1,9 +1,22 @@
+import type { Y } from '@blocksuite/store';
+
 import { keys } from '../../_common/utils/iterable.js';
 import type { ElementModel } from './base.js';
 
 const state = {
+  /**
+   * Skip the field initialization during the model creation.
+   */
   skip: false,
+
+  /**
+   * Whether the model is creating.
+   */
   creating: false,
+
+  /**
+   * Whether the model is in the derive process.
+   */
   derive: false,
 };
 
@@ -113,6 +126,7 @@ export function local(): PropertyDecorator {
           oldValues: {
             [prop]: oldValue,
           },
+          local: true,
         });
       },
     });
@@ -266,9 +280,15 @@ const observerDisposableSymbol = Symbol('observerDisposable');
  * @param fn
  * @returns
  */
-export function observe<T extends ElementModel>(
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function observe<E extends Y.YEvent<any>, T extends ElementModel>(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  fn: (event: any, instance: T, type: 'modified' | 'altered') => void
+  fn: (
+    event: E | null,
+    instance: T,
+    type: 'modified' | 'altered',
+    transaction: Y.Transaction | null
+  ) => void
 ) {
   return function observeDecorator(prototype: unknown, prop: string | symbol) {
     setObjectMeta(observeSymbol, prototype, prop, fn);
@@ -281,9 +301,10 @@ function getObserveMeta(
 ):
   | null
   | ((
-      event: unknown,
+      event: unknown | null,
       instance: unknown,
-      type: 'modified' | 'altered'
+      type: 'modified' | 'altered',
+      transaction: Y.Transaction | null
     ) => void) {
   // @ts-ignore
   return target[observeSymbol]?.[prop] ?? null;
@@ -312,12 +333,12 @@ function startObserve(
 
   const value = receiver[prop as keyof ElementModel];
 
-  observeFn(null, receiver, 'altered');
+  observeFn(null, receiver, 'altered', null);
 
   // @ts-ignore
   try {
-    const fn = (event: unknown) => {
-      observeFn(event, receiver, 'modified');
+    const fn = (event: unknown, transaction: Y.Transaction) => {
+      observeFn(event, receiver, 'modified', transaction);
     };
 
     // @ts-ignore

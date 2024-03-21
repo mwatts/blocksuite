@@ -33,6 +33,7 @@ export function createElementModel(
       id: string;
       props: Record<string, unknown>;
       oldValues: Record<string, unknown>;
+      local: boolean;
     }) => void;
     skipFieldInit?: boolean;
   }
@@ -55,7 +56,7 @@ export function createElementModel(
     yMap,
     model,
     stashedStore: stashed,
-    onChange: props => mounted && options.onChange({ id, ...props }),
+    onChange: payload => mounted && options.onChange({ id, ...payload }),
   }) as ElementModel;
 
   setCreateState(false, false);
@@ -93,9 +94,13 @@ function onElementChange(
   callback: (payload: {
     props: Record<string, unknown>;
     oldValues: Record<string, unknown>;
+    local: boolean;
   }) => void
 ) {
-  const observer = (event: Y.YMapEvent<unknown>) => {
+  const observer = (
+    event: Y.YMapEvent<unknown>,
+    transaction: Y.Transaction
+  ) => {
     const props: Record<string, unknown> = {};
     const oldValues: Record<string, unknown> = {};
 
@@ -116,6 +121,7 @@ function onElementChange(
     callback({
       props,
       oldValues,
+      local: transaction.local,
     });
   };
 
@@ -145,6 +151,7 @@ export function createModelFromProps(
       id: string;
       props: Record<string, unknown>;
       oldValues: Record<string, unknown>;
+      local: boolean;
     }) => void;
   }
 ) {
@@ -167,6 +174,8 @@ export function createModelFromProps(
 
   yMap.set('type', type);
   yMap.set('id', id);
+
+  console.log(type, props);
 
   Object.keys(rest).forEach(key => {
     // @ts-ignore
