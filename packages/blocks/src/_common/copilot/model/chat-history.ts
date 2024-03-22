@@ -7,11 +7,11 @@ import { html, type TemplateResult } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
 
+import type { CopilotServiceResult } from '../service/service-base.js';
 import type {
   ApiData,
   ChatMessage,
   MessageContent,
-  MessageContext,
   MessageSchema,
   UserChatMessage,
 } from './message-schema.js';
@@ -19,16 +19,19 @@ import { MessageSchemas } from './message-type/index.js';
 
 export type CopilotAction<Result> = {
   type: string;
-  run: (context: MessageContext) => AsyncIterable<Result>;
+  run: CopilotServiceResult<Result>;
 };
 
 export interface HistoryItem {
+  isUser: boolean;
+
   render(host: EditorHost): TemplateResult;
 
   toContext(): ChatMessage[];
 }
 
 class UserHistoryItem implements HistoryItem {
+  isUser = true;
   constructor(private message: UserChatMessage) {}
 
   public render(_: EditorHost): TemplateResult {
@@ -48,6 +51,7 @@ class UserHistoryItem implements HistoryItem {
 export class AssistantHistoryItem<Result = unknown, Data = unknown>
   implements HistoryItem
 {
+  isUser = false;
   public value: ApiData<Result> = { status: 'loading' };
   public data?: Data;
   private set: Set<() => void> = new Set();
@@ -77,9 +81,12 @@ export class AssistantHistoryItem<Result = unknown, Data = unknown>
     this.stop();
     const abortController = new AbortController();
     this.abortController = abortController;
-    const result = this.action.run({
-      history: this.history.flatMap(v => v.toContext()),
-    });
+    const result = this.action.run(
+      {
+        history: this.history.flatMap(v => v.toContext()),
+      },
+      abortController.signal
+    );
     const process = async () => {
       let lastValue: Result | undefined;
       for await (const value of result) {
