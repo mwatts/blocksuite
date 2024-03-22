@@ -2,7 +2,7 @@ import type { Y } from '@blocksuite/store';
 import { DocCollection } from '@blocksuite/store';
 
 import { keys } from '../../_common/utils/iterable.js';
-import type { IEdgelessElement } from '../../root-block/edgeless/type.js';
+import type { EdgelessModel } from '../../root-block/edgeless/type.js';
 import { Bound } from '../utils/bound.js';
 import { linePolygonIntersects } from '../utils/math-utils.js';
 import type { PointLocation } from '../utils/point-location.js';
@@ -79,7 +79,7 @@ export class GroupElementModel extends GroupLikeModel<GroupElementProps> {
     return 'group';
   }
 
-  addChild(element: IEdgelessElement | string) {
+  addChild(element: EdgelessModel | string) {
     const id = typeof element === 'string' ? element : element.id;
 
     this.surface.doc.transact(() => {
@@ -87,7 +87,7 @@ export class GroupElementModel extends GroupLikeModel<GroupElementProps> {
     });
   }
 
-  removeDescendant(element: IEdgelessElement | string) {
+  removeDescendant(element: EdgelessModel | string) {
     const id = typeof element === 'string' ? element : element.id;
 
     this.surface.doc.transact(() => {

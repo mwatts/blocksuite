@@ -4,6 +4,7 @@ import { type Y } from '@blocksuite/store';
 
 import type {
   EdgelessBlockModel,
+  EdgelessModel,
   HitTestOptions,
   IEdgelessElement,
 } from '../../root-block/edgeless/type.js';
@@ -295,7 +296,7 @@ export abstract class ElementModel<Props extends BaseProps = BaseProps>
 }
 
 export abstract class GroupLikeModel<
-  Props extends BaseProps,
+  Props extends BaseProps = BaseProps,
 > extends ElementModel<Props> {
   /**
    * The actual field that stores the children of the group.
@@ -349,7 +350,7 @@ export abstract class GroupLikeModel<
   /**
    * Check if the element has the descendant
    */
-  hasDescendant(element: string | IEdgelessElement) {
+  hasDescendant(element: string | EdgelessModel) {
     const groups =
       typeof element === 'string'
         ? this.surface.getGroups(element)
@@ -373,7 +374,7 @@ export abstract class GroupLikeModel<
       }
 
       return prev;
-    }, [] as IEdgelessElement[]);
+    }, [] as EdgelessModel[]);
   }
 
   /**

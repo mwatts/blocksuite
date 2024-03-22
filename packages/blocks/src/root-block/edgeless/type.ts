@@ -170,4 +170,4 @@ export class EdgelessBlockModel<
   }
 }
 
-export type EdgelessModel = EdgelessBlockModel | ElementModel;
+export type EdgelessModel = EdgelessBlockModel | ElementModel | GroupLikeModel;
