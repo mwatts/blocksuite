@@ -2,7 +2,6 @@ import { IS_MAC } from '@blocksuite/global/env';
 
 import { type EdgelessTool } from '../../_common/types.js';
 import { matchFlavours } from '../../_common/utils/model.js';
-import { once } from '../../index.js';
 import {
   Bound,
   ConnectorElementModel,
@@ -220,22 +219,8 @@ export class EdgelessPageKeyboardManager extends PageKeyboardManager {
       }
     );
 
-    this._bindMetaKey();
     this._bindShiftKey();
     this._bindToggleHand();
-  }
-
-  private _bindMetaKey() {
-    this.rootElement.handleEvent(
-      'keyDown',
-      ctx => {
-        const event = ctx.get('defaultState').event;
-        if (event instanceof KeyboardEvent) {
-          this._meta(event);
-        }
-      },
-      { global: true }
-    );
   }
 
   private _bindShiftKey() {
@@ -342,37 +327,6 @@ export class EdgelessPageKeyboardManager extends PageKeyboardManager {
     } else {
       edgeless.slots.pressShiftKeyUpdated.emit(false);
     }
-  }
-
-  private _meta(event: KeyboardEvent) {
-    const edgeless = this.rootElement;
-    const selection = edgeless.service.selection;
-    const currentTool = edgeless.edgelessTool;
-
-    if (
-      selection.editing ||
-      (IS_MAC && !event.metaKey) ||
-      (!IS_MAC && !event.ctrlKey)
-    ) {
-      return;
-    }
-
-    edgeless.tools.metaKey = true;
-    this._setEdgelessTool(edgeless, {
-      type: 'ai',
-    });
-
-    once(document, 'keyup', () => {
-      edgeless.tools.metaKey = false;
-      edgeless.tools.setEdgelessTool(
-        currentTool,
-        {
-          elements: [],
-          editing: false,
-        },
-        false
-      );
-    });
   }
 
   private _delete() {

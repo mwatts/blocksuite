@@ -6,7 +6,6 @@
 packages=(
   "framework/block-std"
   "framework/global"
-  "framework/lit"
   "framework/store"
   "framework/inline"
   "framework/sync"
@@ -19,7 +18,7 @@ packages=(
 replace() {
   mv package-modified.json package.json
 
-  CURRENT_VERSION="0.12.0"
+  CURRENT_VERSION="0.13.0"
   IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
   MINOR=$((MINOR + 1))
   VERSION="$MAJOR.$MINOR.$PATCH"

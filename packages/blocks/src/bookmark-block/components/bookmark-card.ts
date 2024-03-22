@@ -1,4 +1,4 @@
-import { ShadowlessElement, WithDisposable } from '@blocksuite/lit';
+import { ShadowlessElement, WithDisposable } from '@blocksuite/block-std';
 import { html } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
@@ -45,6 +45,15 @@ export class BookmarkCard extends WithDisposable(ShadowlessElement) {
   private _handleDoubleClick(event: MouseEvent) {
     event.stopPropagation();
     this.bookmark.open();
+  }
+
+  private _getHostName(url: string) {
+    try {
+      return new URL(url).hostname;
+    } catch (e) {
+      console.error(e);
+      return url;
+    }
   }
 
   override connectedCallback(): void {
@@ -140,7 +149,7 @@ export class BookmarkCard extends WithDisposable(ShadowlessElement) {
             ${descriptionText}
           </div>
           <div class="affine-bookmark-content-url" @click=${this.bookmark.open}>
-            <span>${url}</span>
+            <span>${this._getHostName(url)}</span>
             <div class="affine-bookmark-content-url-icon">${OpenIcon}</div>
           </div>
         </div>

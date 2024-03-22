@@ -5,17 +5,15 @@ import type {
   UIEventHandler,
   UIEventState,
 } from '@blocksuite/block-std';
+import { IS_MAC } from '@blocksuite/global/env';
 import { DisposableGroup } from '@blocksuite/global/utils';
 
 import {
   type EdgelessTool,
   isMiddleButtonPressed,
-  isPinchEvent,
   isRightButtonPressed,
   NoteDisplayMode,
-  Point,
 } from '../../../_common/utils/index.js';
-import { normalizeWheelDeltaY } from '../../../surface-block/index.js';
 import type { Bound } from '../../../surface-block/utils/bound.js';
 import type { EdgelessToolController } from '../controllers/tools/index.js';
 import type { EdgelessRootBlockComponent } from '../edgeless-root-block.js';
@@ -74,8 +72,6 @@ export class EdgelessToolsManager {
 
   // pressed shift key
   private _shiftKey = false;
-
-  private _metaKey = false;
 
   private _spaceBar = false;
 
@@ -138,14 +134,6 @@ export class EdgelessToolsManager {
 
   get shiftKey() {
     return this._shiftKey;
-  }
-
-  set metaKey(pressed: boolean) {
-    this._metaKey = pressed;
-  }
-
-  get metaKey() {
-    return this._metaKey;
   }
 
   get doc() {
@@ -251,36 +239,6 @@ export class EdgelessToolsManager {
       const event = ctx.get('defaultState');
       this._onContainerContextMenu(event);
     });
-    this._add('wheel', ctx => {
-      const state = ctx.get('defaultState');
-      const e = state.event;
-      if (!(e instanceof WheelEvent)) return;
-
-      e.preventDefault();
-
-      const container = this.container;
-      const { viewport } = this.service;
-      // pan
-      if (!isPinchEvent(e)) {
-        const dx = e.deltaX / viewport.zoom;
-        const dy = e.deltaY / viewport.zoom;
-        viewport.applyDeltaCenter(dx, dy);
-        e.stopPropagation();
-      }
-      // zoom
-      else {
-        const rect = container.getBoundingClientRect();
-        // Perform zooming relative to the mouse position
-        const [baseX, baseY] = this.service.viewport.toModelCoord(
-          e.clientX - rect.x,
-          e.clientY - rect.y
-        );
-
-        const zoom = normalizeWheelDeltaY(e.deltaY, viewport.zoom);
-        viewport.setZoom(zoom, new Point(baseX, baseY));
-        e.stopPropagation();
-      }
-    });
   }
 
   private _add = (name: EventName, fn: UIEventHandler) => {
@@ -355,10 +313,18 @@ export class EdgelessToolsManager {
   };
 
   private _onContainerPointerDown = (e: PointerEventState) => {
-    if (isMiddleButtonPressed(e.raw) || isRightButtonPressed(e.raw)) {
-      const isRightButton = isRightButtonPressed(e.raw);
+    const rawEvt = e.raw;
+    const isMetaKeyPressed = (evt: PointerEvent) =>
+      IS_MAC ? evt.metaKey : evt.ctrlKey;
+
+    if (
+      isMiddleButtonPressed(rawEvt) ||
+      isRightButtonPressed(rawEvt) ||
+      isMetaKeyPressed(rawEvt)
+    ) {
+      const isRightButton = isRightButtonPressed(rawEvt);
       const targetTool = (
-        isRightButton
+        isRightButton || isMetaKeyPressed(rawEvt)
           ? {
               type: 'ai',
             }
@@ -367,7 +333,9 @@ export class EdgelessToolsManager {
       const prevEdgelessTool = this._edgelessTool;
       const targetButtonRelease = (_e: MouseEvent) =>
         (isMiddleButtonPressed(e.raw) && !isMiddleButtonPressed(_e)) ||
-        (isRightButton && !isRightButtonPressed(_e));
+        (isRightButton && !isRightButtonPressed(_e)) ||
+        isMetaKeyPressed(rawEvt);
+
       const switchToPreMode = (_e: MouseEvent) => {
         if (targetButtonRelease(_e)) {
           this.setEdgelessTool(prevEdgelessTool, undefined, !isRightButton);
