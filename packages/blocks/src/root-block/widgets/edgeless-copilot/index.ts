@@ -8,15 +8,15 @@ import {
   on,
   requestConnectedFrame,
 } from '../../../_common/utils/event.js';
-import type { AIToolController } from '../../edgeless/controllers/tools/ai-tool.js';
+import type { CopilotSelectionController } from '../../edgeless/controllers/tools/copilot-tool.js';
 import type { EdgelessRootBlockComponent } from '../../index.js';
 
-export const AFFINE_EDGELESS_AI_WIDGET = 'affine-edgeless-ai-widget';
+export const AFFINE_EDGELESS_COPILOT_WIDGET = 'affine-edgeless-copilot-widget';
 
-@customElement('affine-edgeless-ai-widget')
-export class EdgelessAIWidget extends WidgetElement<EdgelessRootBlockComponent> {
+@customElement(AFFINE_EDGELESS_COPILOT_WIDGET)
+export class EdgelessCopilotWidget extends WidgetElement<EdgelessRootBlockComponent> {
   static override styles = css`
-    .ai-selection-rect {
+    .copilot-selection-rect {
       position: absolute;
       box-sizing: border-box;
       border-radius: 4px;
@@ -84,19 +84,21 @@ export class EdgelessAIWidget extends WidgetElement<EdgelessRootBlockComponent> 
   override connectedCallback(): void {
     super.connectedCallback();
 
-    const AITool = this.edgeless.tools.controllers['ai'] as AIToolController;
+    const CopilotSelectionTool = this.edgeless.tools.controllers[
+      'copilot'
+    ] as CopilotSelectionController;
 
     this._disposables.add(
-      AITool.draggingAreaUpdated.on(() => {
+      CopilotSelectionTool.draggingAreaUpdated.on(() => {
         this._visible = true;
-        this._updateSelection(AITool.area);
+        this._updateSelection(CopilotSelectionTool.area);
         this._watchClickOutside();
       })
     );
 
     this._disposables.add(
       this.edgeless.service.viewport.viewportUpdated.on(() => {
-        this._updateSelection(AITool.area);
+        this._updateSelection(CopilotSelectionTool.area);
       })
     );
   }
@@ -109,7 +111,7 @@ export class EdgelessAIWidget extends WidgetElement<EdgelessRootBlockComponent> 
     return html`<div class="affine-edgeless-ai">
       ${rect?.width && rect?.height
         ? html`<div
-            class="ai-selection-rect"
+            class="copilot-selection-rect"
             style=${styleMap({
               left: `${rect.x}px`,
               top: `${rect.y}px`,
@@ -124,6 +126,6 @@ export class EdgelessAIWidget extends WidgetElement<EdgelessRootBlockComponent> 
 
 declare global {
   interface HTMLElementTagNameMap {
-    [AFFINE_EDGELESS_AI_WIDGET]: EdgelessAIWidget;
+    [AFFINE_EDGELESS_COPILOT_WIDGET]: EdgelessCopilotWidget;
   }
 }
